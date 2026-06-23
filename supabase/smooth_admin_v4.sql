@@ -1,0 +1,7 @@
+-- OnlinDC Smooth Admin v4 SQL
+alter table public.features_library add column if not exists is_star_feature boolean default false, add column if not exists star_score int default 0;
+create table if not exists public.feature_industry_mapping ( id uuid primary key default gen_random_uuid(), feature_id uuid references public.features_library(id) on delete cascade, industry_id uuid references public.industries(id) on delete cascade, relevance_score int default 80, industry_use_case text, priority int default 50, is_active boolean default true, created_at timestamptz default now(), updated_at timestamptz default now());
+create unique index if not exists idx_feature_industry_unique on public.feature_industry_mapping(feature_id, industry_id);
+alter table public.features_library disable row level security; alter table public.feature_media disable row level security; alter table public.feature_industry_mapping disable row level security; alter table public.report_assets disable row level security;
+insert into public.feature_industry_mapping (feature_id, industry_id, relevance_score, industry_use_case, priority, is_active) select f.id, i.id, 80, coalesce(f.short_description,'Useful feature for this industry'), coalesce(f.priority,50), true from public.features_library f join public.industries i on i.slug='fashion' where not exists (select 1 from public.feature_industry_mapping m where m.feature_id=f.id and m.industry_id=i.id);
+select 'ok' as status;
