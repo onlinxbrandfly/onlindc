@@ -2,6 +2,8 @@ import React, { useEffect, useState } from "react";
 import { supabase } from "../services/supabase";
 import useAdminData from "./hooks/useAdminData";
 import SubmissionModal from "./components/SubmissionModal";
+import AdminNavigation from "./components/AdminNavigation";
+import AdminToast from "./components/AdminToast";
 import {
   DashboardPage,
   SubmissionsPage,
@@ -14,6 +16,7 @@ import {
 export default function AdminApp({ navigate }){
   const [tab, setTab] = useState(localStorage.getItem("admin-tab") || "overview");
   const [selectedSubmission, setSelectedSubmission] = useState(null);
+  const [toast, setToast] = useState("");
   const { data, loading, reload } = useAdminData();
 
   useEffect(() => {
@@ -27,23 +30,14 @@ export default function AdminApp({ navigate }){
 
   return (
     <div className="adminLayout">
-      <aside className="sidebar">
-        <div className="brandMark white">Onlin.in</div>
-        <button className={tab==="overview" ? "active" : ""} onClick={() => setTab("overview")}>Dashboard</button>
-        <button className={tab==="crm" ? "active" : ""} onClick={() => setTab("crm")}>CRM</button>
-        <button className={tab==="submissions" ? "active" : ""} onClick={() => setTab("submissions")}>Submissions</button>
-        <button className={tab==="builder" ? "active" : ""} onClick={() => setTab("builder")}>Form Builder</button>
-        <button className={tab==="knowledge" ? "active" : ""} onClick={() => setTab("knowledge")}>Knowledge Centre</button>
-        <button className={tab==="industries" ? "active" : ""} onClick={() => setTab("industries")}>Industries</button>
-        <button onClick={logout}>Logout</button>
-      </aside>
+      <AdminNavigation tab={tab} onTabChange={setTab} onLogout={logout} />
 
       <main className="adminMain">
         {loading ? <h2>Loading...</h2> : (
           <>
-            {tab === "overview" && <DashboardPage data={data} />}
-            {tab === "crm" && <CRMPage data={data} reload={reload} />}
-            {tab === "submissions" && <SubmissionsPage submissions={data.submissions} answers={data.answers} onView={setSelectedSubmission} />}
+            {tab === "overview" && <DashboardPage data={data} onNavigate={setTab} />}
+            {tab === "crm" && <CRMPage data={data} reload={reload} notify={setToast} />}
+            {tab === "submissions" && <SubmissionsPage submissions={data.submissions} answers={data.answers} onView={setSelectedSubmission} notify={setToast} />}
             {tab === "builder" && <FormBuilderPage data={data} reload={reload} />}
             {tab === "knowledge" && <KnowledgePage data={data} reload={reload} />}
             {tab === "industries" && <IndustriesPage industries={data.industries} reload={reload} />}
@@ -58,6 +52,7 @@ export default function AdminApp({ navigate }){
           onClose={() => setSelectedSubmission(null)}
         />
       )}
+      <AdminToast message={toast} onClose={() => setToast("")} />
     </div>
   );
 }

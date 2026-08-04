@@ -1,11 +1,13 @@
-import React from "react";
+import React, { useState } from "react";
 import { CRM_STAGES, leadContact } from "../services/crmService";
 
 export default function CRMPipeline({ leads, onOpen, onMove }) {
+  const [mobileStage, setMobileStage] = useState("New");
   return <div className="crmPipeline">
+    <div className="pipelineStagePicker"><select aria-label="Pipeline stage" value={mobileStage} onChange={(event) => setMobileStage(event.target.value)}>{CRM_STAGES.map((stage) => <option key={stage}>{stage} ({leads.filter((lead) => (lead.stage || lead.status || "New") === stage).length})</option>)}</select></div>
     {CRM_STAGES.map((stage) => {
       const items = leads.filter((lead) => (lead.stage || lead.status || "New") === stage);
-      return <section className="pipelineColumn" key={stage}>
+      return <section className={`pipelineColumn ${mobileStage === stage ? "mobileActive" : ""}`} key={stage}>
         <header><b>{stage}</b><span>{items.length}</span></header>
         <div className="pipelineCards">
           {items.map((lead) => {
@@ -16,10 +18,6 @@ export default function CRMPipeline({ leads, onOpen, onMove }) {
           })}
           {!items.length && <p className="pipelineEmpty">No leads</p>}
         </div>
-        {items.length > 0 && <select aria-label={`Move a lead from ${stage}`} defaultValue="" onChange={(e) => { const [leadId, next] = e.target.value.split("|"); if (leadId) onMove(leads.find((lead) => lead.id === leadId), next); e.target.value = ""; }}>
-          <option value="">Move lead...</option>
-          {items.flatMap((lead) => CRM_STAGES.filter((next) => next !== stage).map((next) => <option key={`${lead.id}-${next}`} value={`${lead.id}|${next}`}>{leadContact(lead).businessName} to {next}</option>))}
-        </select>}
       </section>;
     })}
   </div>;
