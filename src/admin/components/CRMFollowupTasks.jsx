@@ -1,5 +1,5 @@
 import React from "react";
-import { crmCallLink, crmWhatsappLink, leadContact } from "../services/crmService";
+import { crmCallLink, leadContact } from "../services/crmService";
 
 function bucket(task) {
   const due = new Date(task.due_at);
@@ -9,7 +9,7 @@ function bucket(task) {
   return "Upcoming";
 }
 
-export default function CRMFollowupTasks({ tasks, leads, onComplete, onSkip, onReschedule, limit = 30 }) {
+export default function CRMFollowupTasks({ tasks, leads, onComplete, onSkip, onReschedule, onWhatsApp, limit = 30 }) {
   const leadById = new Map(leads.map((lead) => [lead.id, lead]));
   const nextByLead = new Map();
   tasks.filter((task) => task.status === "Pending").sort((a, b) => new Date(a.due_at) - new Date(b.due_at)).forEach((task) => {
@@ -22,12 +22,11 @@ export default function CRMFollowupTasks({ tasks, leads, onComplete, onSkip, onR
       const lead = leadById.get(task.lead_id);
       const contact = leadContact(lead);
       const call = lead && crmCallLink(lead);
-      const whatsapp = lead && crmWhatsappLink({ lead, task });
       return <article className={`crmTask ${bucket(task).toLowerCase()}`} key={task.id}>
         <div className="taskDue"><b>{bucket(task)}</b><span>{new Date(task.due_at).toLocaleDateString()}</span></div>
         <div className="taskMain"><b>{task.title}</b><span>{contact.businessName} {contact.contactName ? `- ${contact.contactName}` : ""}</span><small>{task.message || task.channel}</small></div>
         <div className="rowActions">
-          {call && <a href={call}>Call</a>}{whatsapp && <a href={whatsapp} target="_blank" rel="noreferrer">WhatsApp</a>}
+          {call && <a href={call}>Call</a>}{contact.phone && <button type="button" onClick={() => onWhatsApp(lead, task)}>WhatsApp</button>}
           <button type="button" className="taskDone" onClick={() => onComplete(task)}>Done</button>
           <button type="button" onClick={() => onReschedule(task)}>Later</button>
           <button type="button" onClick={() => onSkip(task)}>Skip</button>

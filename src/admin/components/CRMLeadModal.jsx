@@ -1,12 +1,12 @@
 import React, { useState } from "react";
-import { CRM_CHANNELS, CRM_STAGES, crmCallLink, crmReportUrl, crmWhatsappLink, leadContact } from "../services/crmService";
+import { CRM_CHANNELS, CRM_STAGES, crmCallLink, crmReportUrl, leadContact } from "../services/crmService";
 
 function localDateTime(days = 1) {
   const date = new Date(); date.setDate(date.getDate() + days); date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
   return date.toISOString().slice(0, 16);
 }
 
-export default function CRMLeadModal({ lead, tasks, events, onClose, onEdit, onStatusChange, onAddActivity, onCreateTask, onComplete, onSkip, onReschedule }) {
+export default function CRMLeadModal({ lead, tasks, events, onClose, onEdit, onStatusChange, onAddActivity, onCreateTask, onComplete, onSkip, onReschedule, onWhatsApp }) {
   const contact = leadContact(lead);
   const leadTasks = tasks.filter((task) => task.lead_id === lead.id);
   const leadEvents = events.filter((event) => event.lead_id === lead.id).sort((a, b) => new Date(b.occurred_at || b.created_at) - new Date(a.occurred_at || a.created_at));
@@ -14,11 +14,10 @@ export default function CRMLeadModal({ lead, tasks, events, onClose, onEdit, onS
   const [task, setTask] = useState({ title: "Follow up", channel: "Call", dueAt: localDateTime(), message: "" });
   const report = crmReportUrl(lead);
   const call = crmCallLink(lead);
-  const whatsapp = crmWhatsappLink({ lead });
 
   return <div className="modalBackdrop"><div className="modal builderModal crmLeadDetail">
     <button className="modalClose" onClick={onClose} aria-label="Close">x</button>
-    <div className="crmDetailHead"><div><span className="crmStage">{lead.stage || lead.status}</span><h2>{contact.businessName}</h2><p>{contact.contactName || "No contact name"} {contact.phone ? `- ${contact.phone}` : ""}</p></div><div className="rowActions"><button onClick={() => onEdit(lead)}>Edit</button>{call && <a href={call}>Call</a>}{whatsapp && <a href={whatsapp} target="_blank" rel="noreferrer">WhatsApp</a>}{report && <a href={report} target="_blank" rel="noreferrer">Report</a>}</div></div>
+    <div className="crmDetailHead"><div><span className="crmStage">{lead.stage || lead.status}</span><h2>{contact.businessName}</h2><p>{contact.contactName || "No contact name"} {contact.phone ? `- ${contact.phone}` : ""}</p></div><div className="rowActions"><button onClick={() => onEdit(lead)}>Edit</button>{call && <a href={call}>Call</a>}{contact.phone && <button onClick={() => onWhatsApp(lead)}>WhatsApp</button>}{report && <a href={report} target="_blank" rel="noreferrer">Report</a>}</div></div>
 
     <div className="crmDetailGrid">
       <main>
@@ -27,7 +26,7 @@ export default function CRMLeadModal({ lead, tasks, events, onClose, onEdit, onS
         </section>
 
         <section className="crmInfoPanel"><div className="crmSectionHead"><h3>Follow-up plan</h3><b>{leadTasks.filter((item) => item.status === "Pending").length} pending</b></div>
-          {leadTasks.sort((a, b) => new Date(a.due_at) - new Date(b.due_at)).map((item) => <div className="crmMiniTask" key={item.id}><div><b>{item.title}</b><small>{item.channel} - {new Date(item.due_at).toLocaleString()} - {item.status}</small></div><div className="rowActions">{item.status === "Pending" && <><button onClick={() => onComplete(item)}>Done</button><button onClick={() => onReschedule(item)}>Later</button><button onClick={() => onSkip(item)}>Skip</button></>}</div></div>)}
+          {leadTasks.sort((a, b) => new Date(a.due_at) - new Date(b.due_at)).map((item) => <div className="crmMiniTask" key={item.id}><div><b>{item.title}</b><small>{item.channel} - {new Date(item.due_at).toLocaleString()} - {item.status}</small></div><div className="rowActions">{item.status === "Pending" && <>{item.channel?.toLowerCase() === "whatsapp" && <button onClick={() => onWhatsApp(lead, item)}>WhatsApp</button>}<button onClick={() => onComplete(item)}>Done</button><button onClick={() => onReschedule(item)}>Later</button><button onClick={() => onSkip(item)}>Skip</button></>}</div></div>)}
           {!leadTasks.length && <p className="muted">No follow-ups created yet.</p>}
           <form className="crmInlineForm" onSubmit={(e) => { e.preventDefault(); onCreateTask({ ...task, dueAt: new Date(task.dueAt).toISOString() }); }}><input value={task.title} onChange={(e) => setTask({ ...task, title: e.target.value })} required /><select value={task.channel} onChange={(e) => setTask({ ...task, channel: e.target.value })}>{CRM_CHANNELS.filter((item) => item !== "Note").map((item) => <option key={item}>{item}</option>)}</select><input type="datetime-local" value={task.dueAt} onChange={(e) => setTask({ ...task, dueAt: e.target.value })} required /><button className="btn">Add follow-up</button></form>
         </section>

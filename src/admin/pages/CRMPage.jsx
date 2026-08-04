@@ -5,6 +5,8 @@ import CRMLeadForm from "../components/CRMLeadForm";
 import CRMLeadModal from "../components/CRMLeadModal";
 import CRMLeadTable from "../components/CRMLeadTable";
 import CRMPipeline from "../components/CRMPipeline";
+import FollowupPlaybooks from "../components/FollowupPlaybooks";
+import WhatsAppComposer from "../components/WhatsAppComposer";
 import {
   addCrmActivity, completeCrmTask, createCrmTask, leadContact, rescheduleCrmTask,
   saveCrmLead, skipCrmTask, syncCrmFromSubmissions, updateCrmLeadStatus
@@ -21,6 +23,7 @@ export default function CRMPage({ data, reload, notify = () => {} }) {
   const [showLeadForm, setShowLeadForm] = useState(false);
   const [busy, setBusy] = useState(false);
   const [dialog, setDialog] = useState(null);
+  const [whatsapp, setWhatsapp] = useState(null);
 
   const sortedLeads = useMemo(() => [...(data.crmLeads || [])].sort((a, b) => Number(b.priority_score || 0) - Number(a.priority_score || 0) || new Date(b.created_at) - new Date(a.created_at)), [data.crmLeads]);
   const filteredLeads = useMemo(() => sortedLeads.filter((lead) => {
@@ -111,12 +114,13 @@ export default function CRMPage({ data, reload, notify = () => {} }) {
 
     <nav className="crmViewTabs" aria-label="CRM views"><button className={view === "today" ? "active" : ""} onClick={() => setView("today")}>Today</button><button className={view === "leads" ? "active" : ""} onClick={() => setView("leads")}>Leads</button><button className={view === "pipeline" ? "active" : ""} onClick={() => setView("pipeline")}>Pipeline</button></nav>
 
-    {view === "today" && <CRMFollowupTasks tasks={data.crmTasks || []} leads={sortedLeads} onComplete={complete} onSkip={skip} onReschedule={reschedule} />}
-    {view === "leads" && <><CRMFilters filters={filters} onChange={setFilters} /><CRMLeadTable leads={filteredLeads} tasks={data.crmTasks || []} onOpen={setSelectedLead} /></>}
+    {view === "today" && <><FollowupPlaybooks templates={data.crmTemplates || []} /><CRMFollowupTasks tasks={data.crmTasks || []} leads={sortedLeads} onComplete={complete} onSkip={skip} onReschedule={reschedule} onWhatsApp={(lead, task) => setWhatsapp({ lead, task })} /></>}
+    {view === "leads" && <><CRMFilters filters={filters} onChange={setFilters} /><CRMLeadTable leads={filteredLeads} tasks={data.crmTasks || []} onOpen={setSelectedLead} onWhatsApp={(lead, task) => setWhatsapp({ lead, task })} /></>}
     {view === "pipeline" && <CRMPipeline leads={filteredLeads} onOpen={setSelectedLead} onMove={changeStatus} />}
 
     {showLeadForm && <CRMLeadForm lead={editingLead} leads={sortedLeads} industries={data.industries || []} onClose={() => { setShowLeadForm(false); setEditingLead(null); }} onSave={saveLead} />}
-    {selectedLead && <CRMLeadModal lead={selectedLead} tasks={data.crmTasks || []} events={data.crmEvents || []} onClose={() => setSelectedLead(null)} onEdit={(lead) => { setEditingLead(lead); setSelectedLead(null); setShowLeadForm(true); }} onStatusChange={changeStatus} onComplete={complete} onSkip={skip} onReschedule={reschedule} onAddActivity={async (activity) => { try { await addCrmActivity({ leadId: selectedLead.id, type: "activity", ...activity }); await refreshAndClose(); notify("Activity added."); } catch (error) { notify(error.message || "Could not add activity."); } }} onCreateTask={async (task) => { try { await createCrmTask({ leadId: selectedLead.id, ...task }); await refreshAndClose(); notify("Follow-up added."); } catch (error) { notify(error.message || "Could not add follow-up."); } }} />}
+    {selectedLead && <CRMLeadModal lead={selectedLead} tasks={data.crmTasks || []} events={data.crmEvents || []} onClose={() => setSelectedLead(null)} onEdit={(lead) => { setEditingLead(lead); setSelectedLead(null); setShowLeadForm(true); }} onStatusChange={changeStatus} onComplete={complete} onSkip={skip} onReschedule={reschedule} onWhatsApp={(lead, task) => setWhatsapp({ lead, task })} onAddActivity={async (activity) => { try { await addCrmActivity({ leadId: selectedLead.id, type: "activity", ...activity }); await refreshAndClose(); notify("Activity added."); } catch (error) { notify(error.message || "Could not add activity."); } }} onCreateTask={async (task) => { try { await createCrmTask({ leadId: selectedLead.id, ...task }); await refreshAndClose(); notify("Follow-up added."); } catch (error) { notify(error.message || "Could not add follow-up."); } }} />}
+    {whatsapp && <WhatsAppComposer lead={whatsapp.lead} task={whatsapp.task} onClose={() => setWhatsapp(null)} onReschedule={reschedule} onOutcome={async (outcome, message) => { try { if (whatsapp.task) await completeCrmTask({ leadId: whatsapp.lead.id, taskId: whatsapp.task.id, outcome, note: message }); else await addCrmActivity({ leadId: whatsapp.lead.id, type: "contacted", channel: "WhatsApp", outcome, note: message }); await reload(); notify(`${outcome} recorded.`); } catch (error) { notify(error.message || "Could not record WhatsApp activity."); throw error; } }} />}
     {dialog && <div className="appSheetBackdrop"><form className="appSheet crmActionSheet" onSubmit={submitDialog}><div className="appSheetHandle"/><header><h2>{dialog.type === "complete" ? "Complete follow-up" : dialog.type === "reschedule" ? "Choose a new time" : dialog.type === "lost" ? "Mark lead as lost" : "Skip follow-up?"}</h2><button type="button" aria-label="Close" onClick={() => setDialog(null)}><X size={21}/></button></header>{dialog.type === "complete" && <label><span>Outcome</span><select value={dialog.value} onChange={(event) => setDialog({ ...dialog, value: event.target.value })}><option>Connected</option><option>No answer</option><option>Interested</option><option>Demo requested</option><option>Not interested</option></select></label>}{dialog.type === "reschedule" && <label><span>Follow up on</span><input type="datetime-local" required value={dialog.value} onChange={(event) => setDialog({ ...dialog, value: event.target.value })}/></label>}{dialog.type === "lost" && <label><span>Reason</span><textarea required value={dialog.value} onChange={(event) => setDialog({ ...dialog, value: event.target.value })} placeholder="What happened?"/></label>}{dialog.type === "skip" && <p>This removes the task from Today but keeps it in the lead history.</p>}<div className="modalActions"><button type="button" className="btn" onClick={() => setDialog(null)}>Cancel</button><button className="btn primary">Confirm</button></div></form></div>}
   </>;
 }

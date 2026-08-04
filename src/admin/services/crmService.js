@@ -47,10 +47,10 @@ export function crmReportUrl(leadOrSubmission) {
   return `${window.location.origin}/report/${submission.id}`;
 }
 
-export function crmWhatsappLink({ lead, task }) {
+export function crmWhatsappLink({ lead, task, message }) {
   const phone = normalizePhone(leadContact(lead).phone);
   if (!phone) return "";
-  return `https://wa.me/91${phone}?text=${encodeURIComponent(task?.message || "")}`;
+  return `https://wa.me/91${phone}?text=${encodeURIComponent(message ?? task?.message ?? "")}`;
 }
 
 export function crmCallLink(lead) {
