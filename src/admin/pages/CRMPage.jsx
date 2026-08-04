@@ -7,15 +7,16 @@ import CRMLeadTable from "../components/CRMLeadTable";
 import CRMPipeline from "../components/CRMPipeline";
 import FollowupPlaybooks from "../components/FollowupPlaybooks";
 import WhatsAppComposer from "../components/WhatsAppComposer";
+import { assignLead } from "../services/agentService";
 import {
   addCrmActivity, completeCrmTask, createCrmTask, leadContact, rescheduleCrmTask,
   saveCrmLead, skipCrmTask, syncCrmFromSubmissions, updateCrmLeadStatus
 } from "../services/crmService";
 import { Plus, RefreshCw, X } from "lucide-react";
 
-const EMPTY_FILTERS = { search: "", stage: "", source: "", priority: "" };
+const EMPTY_FILTERS = { search: "", stage: "", source: "", priority: "", agent: "" };
 
-export default function CRMPage({ data, reload, notify = () => {} }) {
+export default function CRMPage({ data, reload, notify = () => {}, currentAgent }) {
   const [view, setView] = useState("today");
   const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [selectedLead, setSelectedLead] = useState(null);
@@ -24,6 +25,7 @@ export default function CRMPage({ data, reload, notify = () => {} }) {
   const [busy, setBusy] = useState(false);
   const [dialog, setDialog] = useState(null);
   const [whatsapp, setWhatsapp] = useState(null);
+  const canManage = ["admin", "manager"].includes(currentAgent?.role);
 
   const sortedLeads = useMemo(() => [...(data.crmLeads || [])].sort((a, b) => Number(b.priority_score || 0) - Number(a.priority_score || 0) || new Date(b.created_at) - new Date(a.created_at)), [data.crmLeads]);
   const filteredLeads = useMemo(() => sortedLeads.filter((lead) => {
@@ -32,7 +34,8 @@ export default function CRMPage({ data, reload, notify = () => {} }) {
     return (!filters.search || haystack.includes(filters.search.toLowerCase())) &&
       (!filters.stage || (lead.stage || lead.status) === filters.stage) &&
       (!filters.source || lead.source === filters.source) &&
-      (!filters.priority || lead.priority_label === filters.priority);
+      (!filters.priority || lead.priority_label === filters.priority) &&
+      (!filters.agent || (filters.agent === "unassigned" ? !lead.assigned_agent_id : lead.assigned_agent_id === filters.agent));
   }), [sortedLeads, filters]);
   const nextTaskByLead = new Map();
   (data.crmTasks || []).filter((task) => task.status === "Pending").sort((a, b) => new Date(a.due_at) - new Date(b.due_at)).forEach((task) => {
@@ -61,7 +64,9 @@ export default function CRMPage({ data, reload, notify = () => {} }) {
 
   async function saveLead(values, leadId) {
     try {
-      await saveCrmLead({ values, leadId, templates: data.crmTemplates, createPlan: values.createPlan });
+      const previous = leadId ? sortedLeads.find((lead) => lead.id === leadId) : null;
+      const saved = await saveCrmLead({ values, leadId, templates: data.crmTemplates, createPlan: values.createPlan });
+      if ((previous?.assigned_agent_id || null) !== (saved.assigned_agent_id || null)) await assignLead({ leadId: saved.id, fromAgentId: previous?.assigned_agent_id, toAgentId: saved.assigned_agent_id, reason: leadId ? "Reassigned while editing lead" : "Assigned when lead was created" });
       setShowLeadForm(false); setEditingLead(null); setSelectedLead(null);
       await reload(); notify(leadId ? "Lead updated." : "Lead added to CRM.");
     } catch (error) { notify(error.message || "Could not save lead."); throw error; }
@@ -115,10 +120,10 @@ export default function CRMPage({ data, reload, notify = () => {} }) {
     <nav className="crmViewTabs" aria-label="CRM views"><button className={view === "today" ? "active" : ""} onClick={() => setView("today")}>Today</button><button className={view === "leads" ? "active" : ""} onClick={() => setView("leads")}>Leads</button><button className={view === "pipeline" ? "active" : ""} onClick={() => setView("pipeline")}>Pipeline</button></nav>
 
     {view === "today" && <><FollowupPlaybooks templates={data.crmTemplates || []} /><CRMFollowupTasks tasks={data.crmTasks || []} leads={sortedLeads} onComplete={complete} onSkip={skip} onReschedule={reschedule} onWhatsApp={(lead, task) => setWhatsapp({ lead, task })} /></>}
-    {view === "leads" && <><CRMFilters filters={filters} onChange={setFilters} /><CRMLeadTable leads={filteredLeads} tasks={data.crmTasks || []} onOpen={setSelectedLead} onWhatsApp={(lead, task) => setWhatsapp({ lead, task })} /></>}
+    {view === "leads" && <><CRMFilters filters={filters} onChange={setFilters} agents={data.salesAgents || []} canManage={canManage} /><CRMLeadTable leads={filteredLeads} tasks={data.crmTasks || []} onOpen={setSelectedLead} onWhatsApp={(lead, task) => setWhatsapp({ lead, task })} /></>}
     {view === "pipeline" && <CRMPipeline leads={filteredLeads} onOpen={setSelectedLead} onMove={changeStatus} />}
 
-    {showLeadForm && <CRMLeadForm lead={editingLead} leads={sortedLeads} industries={data.industries || []} onClose={() => { setShowLeadForm(false); setEditingLead(null); }} onSave={saveLead} />}
+    {showLeadForm && <CRMLeadForm lead={editingLead} leads={sortedLeads} industries={data.industries || []} agents={data.salesAgents || []} canManage={canManage} currentAgent={currentAgent} onClose={() => { setShowLeadForm(false); setEditingLead(null); }} onSave={saveLead} />}
     {selectedLead && <CRMLeadModal lead={selectedLead} tasks={data.crmTasks || []} events={data.crmEvents || []} onClose={() => setSelectedLead(null)} onEdit={(lead) => { setEditingLead(lead); setSelectedLead(null); setShowLeadForm(true); }} onStatusChange={changeStatus} onComplete={complete} onSkip={skip} onReschedule={reschedule} onWhatsApp={(lead, task) => setWhatsapp({ lead, task })} onAddActivity={async (activity) => { try { await addCrmActivity({ leadId: selectedLead.id, type: "activity", ...activity }); await refreshAndClose(); notify("Activity added."); } catch (error) { notify(error.message || "Could not add activity."); } }} onCreateTask={async (task) => { try { await createCrmTask({ leadId: selectedLead.id, ...task }); await refreshAndClose(); notify("Follow-up added."); } catch (error) { notify(error.message || "Could not add follow-up."); } }} />}
     {whatsapp && <WhatsAppComposer lead={whatsapp.lead} task={whatsapp.task} onClose={() => setWhatsapp(null)} onReschedule={reschedule} onOutcome={async (outcome, message) => { try { if (whatsapp.task) await completeCrmTask({ leadId: whatsapp.lead.id, taskId: whatsapp.task.id, outcome, note: message }); else await addCrmActivity({ leadId: whatsapp.lead.id, type: "contacted", channel: "WhatsApp", outcome, note: message }); await reload(); notify(`${outcome} recorded.`); } catch (error) { notify(error.message || "Could not record WhatsApp activity."); throw error; } }} />}
     {dialog && <div className="appSheetBackdrop"><form className="appSheet crmActionSheet" onSubmit={submitDialog}><div className="appSheetHandle"/><header><h2>{dialog.type === "complete" ? "Complete follow-up" : dialog.type === "reschedule" ? "Choose a new time" : dialog.type === "lost" ? "Mark lead as lost" : "Skip follow-up?"}</h2><button type="button" aria-label="Close" onClick={() => setDialog(null)}><X size={21}/></button></header>{dialog.type === "complete" && <label><span>Outcome</span><select value={dialog.value} onChange={(event) => setDialog({ ...dialog, value: event.target.value })}><option>Connected</option><option>No answer</option><option>Interested</option><option>Demo requested</option><option>Not interested</option></select></label>}{dialog.type === "reschedule" && <label><span>Follow up on</span><input type="datetime-local" required value={dialog.value} onChange={(event) => setDialog({ ...dialog, value: event.target.value })}/></label>}{dialog.type === "lost" && <label><span>Reason</span><textarea required value={dialog.value} onChange={(event) => setDialog({ ...dialog, value: event.target.value })} placeholder="What happened?"/></label>}{dialog.type === "skip" && <p>This removes the task from Today but keeps it in the lead history.</p>}<div className="modalActions"><button type="button" className="btn" onClick={() => setDialog(null)}>Cancel</button><button className="btn primary">Confirm</button></div></form></div>}

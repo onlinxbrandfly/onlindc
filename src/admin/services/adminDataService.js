@@ -19,11 +19,14 @@ export const initialAdminData = {
   crmLeads: [],
   crmTemplates: [],
   crmTasks: [],
-  crmEvents: []
+  crmEvents: [],
+  salesAgents: [],
+  salesTeams: [],
+  leadAssignments: []
 };
 
 export async function loadAdminData(){
-  const [subRes, ansRes, indRes, secRes, qRes, optRes, kRes, fRes, ucRes, mediaRes, assetRes, catRes, painRes, mapRes, heroRes, crmLeadRes, crmTemplateRes, crmTaskRes, crmEventRes] = await Promise.all([
+  const [subRes, ansRes, indRes, secRes, qRes, optRes, kRes, fRes, ucRes, mediaRes, assetRes, catRes, painRes, mapRes, heroRes, crmLeadRes, crmTemplateRes, crmTaskRes, crmEventRes, agentRes, teamRes, assignmentRes] = await Promise.all([
     supabase.from("submissions").select("*, industries(name)").order("created_at", { ascending: false }),
     supabase.from("submission_answers").select("*, questions(question_text, question_key)").order("created_at", { ascending: true }),
     supabase.from("industries").select("*").order("sort_order", { ascending: true }),
@@ -42,7 +45,10 @@ export async function loadAdminData(){
     supabase.from("crm_leads").select("*, industries(name), submissions(*, industries(name))").order("priority_score", { ascending: false }),
     supabase.from("crm_followup_templates").select("*").eq("is_active", true).order("day_offset", { ascending: true }),
     supabase.from("crm_followup_tasks").select("*").order("due_at", { ascending: true }),
-    supabase.from("crm_followup_events").select("*").order("created_at", { ascending: false })
+    supabase.from("crm_followup_events").select("*").order("created_at", { ascending: false }),
+    supabase.from("sales_agents").select("*, sales_teams(name)").order("full_name"),
+    supabase.from("sales_teams").select("*").order("name"),
+    supabase.from("lead_assignments").select("*").order("created_at", { ascending: false })
   ]);
 
   return {
@@ -64,6 +70,9 @@ export async function loadAdminData(){
     crmLeads: crmLeadRes.data || [],
     crmTemplates: crmTemplateRes.data || [],
     crmTasks: crmTaskRes.data || [],
-    crmEvents: crmEventRes.data || []
+    crmEvents: crmEventRes.data || [],
+    salesAgents: agentRes.data || [],
+    salesTeams: teamRes.data || [],
+    leadAssignments: assignmentRes.data || []
   };
 }

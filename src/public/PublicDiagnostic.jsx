@@ -184,6 +184,12 @@ export default function PublicDiagnostic(){
     const email = getAnswerByKey("email") || "";
     const reportSlug = `${slugify(businessName)}-${Date.now().toString(36)}`;
     const reportUrl = `${window.location.origin}/report/${reportSlug}`;
+    const agentCode = new URLSearchParams(window.location.search).get("agent");
+    let sourceAgentId = null;
+    if (agentCode) {
+      const { data } = await supabase.rpc("resolve_sales_agent_code", { code_value: agentCode });
+      sourceAgentId = data || null;
+    }
 
     const summary = `${businessName} currently has a ${score.percentage}% digital readiness score. This means the business is at the "${stage}" stage and can grow faster with a more structured digital commerce system.`;
 
@@ -201,6 +207,7 @@ export default function PublicDiagnostic(){
         report_summary: summary,
         report_slug: reportSlug,
         report_url: reportUrl,
+        source_agent_id: sourceAgentId,
         report_generated_at: new Date().toISOString()
       })
       .select()

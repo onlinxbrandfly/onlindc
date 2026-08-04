@@ -113,6 +113,7 @@ async function insertSequence(lead, templates = [], startAt = new Date().toISOSt
     const template = templateByTitle.get(step.title);
     return {
       lead_id: lead.id,
+      assigned_agent_id: lead.assigned_agent_id || null,
       template_id: template?.id || null,
       sequence_day: step.day,
       title: step.title,
@@ -141,6 +142,7 @@ export function findPossibleDuplicates(leads, values, editingId) {
 }
 
 export async function saveCrmLead({ values, leadId, templates = [], createPlan = true }) {
+  const { data: { user } } = await supabase.auth.getUser();
   const priority = priorityFor({
     score: values.diagnostic_score,
     painPoints: values.detected_pain_points,
@@ -164,7 +166,9 @@ export async function saveCrmLead({ values, leadId, templates = [], createPlan =
     requirements: values.requirements?.trim() || null,
     notes: values.notes?.trim() || null,
     estimated_value: values.estimated_value ? Number(values.estimated_value) : null,
-    assigned_to: values.assigned_to?.trim() || null,
+    assigned_agent_id: values.assigned_agent_id || user?.id || null,
+    created_by_agent_id: leadId ? undefined : user?.id || null,
+    assigned_at: values.assigned_agent_id || user?.id ? new Date().toISOString() : null,
     next_action: values.next_action?.trim() || "Make first contact",
     next_followup_at: values.next_followup_at || new Date().toISOString(),
     priority_score: priority.score,
@@ -204,6 +208,8 @@ export async function syncCrmFromSubmissions({ submissions, answers, templates }
       normalized_phone: normalizePhone(submission.phone) || null,
       email: submission.email || null,
       source: "Diagnostic",
+      assigned_agent_id: submission.source_agent_id || null,
+      created_by_agent_id: submission.source_agent_id || null,
       stage: "New",
       status: "New",
       temperature: "Warm",
@@ -236,10 +242,11 @@ export async function updateCrmLeadStatus({ leadId, status, notes, lostReason })
 }
 
 export async function addCrmActivity({ leadId, type, channel, outcome, note, taskId }) {
+  const { data: { user } } = await supabase.auth.getUser();
   const now = new Date().toISOString();
   const { error } = await supabase.from("crm_followup_events").insert({
     lead_id: leadId, task_id: taskId || null, event_type: type, channel: channel || null,
-    outcome: outcome || null, note: note || null, occurred_at: now
+    outcome: outcome || null, note: note || null, occurred_at: now, actor_agent_id: user?.id || null
   });
   if (error) throw error;
   await supabase.from("crm_leads").update({ last_activity_at: now, updated_at: now }).eq("id", leadId);
@@ -255,12 +262,14 @@ export async function createCrmTask({ leadId, title, channel, dueAt, message }) 
 }
 
 export async function completeCrmTask({ leadId, taskId, note, outcome = "Completed" }) {
+  const { data: { user } } = await supabase.auth.getUser();
   const now = new Date().toISOString();
-  const { error } = await supabase.from("crm_followup_tasks").update({ status: "Completed", outcome, completed_at: now, updated_at: now }).eq("id", taskId);
+  const { error } = await supabase.from("crm_followup_tasks").update({ status: "Completed", outcome, completed_at: now, completed_by_agent_id: user?.id || null, updated_at: now }).eq("id", taskId);
   if (error) throw error;
+  const { data: currentLead } = await supabase.from("crm_leads").select("first_contacted_at").eq("id", leadId).maybeSingle();
   const { data: nextTask } = await supabase.from("crm_followup_tasks").select("title, due_at").eq("lead_id", leadId).eq("status", "Pending").order("due_at").limit(1).maybeSingle();
   await supabase.from("crm_leads").update({
-    last_contacted_at: now, last_activity_at: now,
+    last_contacted_at: now, first_contacted_at: currentLead?.first_contacted_at || now, last_activity_at: now,
     next_action: nextTask?.title || null, next_followup_at: nextTask?.due_at || null, updated_at: now
   }).eq("id", leadId);
   await addCrmActivity({ leadId, taskId, type: "contacted", outcome, note: note || "Follow-up completed" });

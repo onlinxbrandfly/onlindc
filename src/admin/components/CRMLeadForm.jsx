@@ -8,7 +8,7 @@ function localDateTime(value) {
   return date.toISOString().slice(0, 16);
 }
 
-export default function CRMLeadForm({ lead, leads, industries, onClose, onSave }) {
+export default function CRMLeadForm({ lead, leads, industries, agents = [], canManage = false, currentAgent, onClose, onSave }) {
   const [saving, setSaving] = useState(false);
   const [step, setStep] = useState(0);
   const [values, setValues] = useState({
@@ -26,7 +26,7 @@ export default function CRMLeadForm({ lead, leads, industries, onClose, onSave }
     requirements: lead?.requirements || "",
     notes: lead?.notes || "",
     estimated_value: lead?.estimated_value || "",
-    assigned_to: lead?.assigned_to || "",
+    assigned_agent_id: lead?.assigned_agent_id || currentAgent?.id || "",
     next_action: lead?.next_action || "Make first contact",
     next_followup_at: localDateTime(lead?.next_followup_at),
     createPlan: !lead
@@ -89,7 +89,7 @@ export default function CRMLeadForm({ lead, leads, industries, onClose, onSave }
         {step === 2 && <div className="crmStepPanel"><p className="muted">Decide the next clear action. You can change this anytime.</p><div className="crmFormGrid">
           <label><span>Next action</span><input value={values.next_action} onChange={(e) => set("next_action", e.target.value)} /></label>
           <label><span>Follow up on</span><input type="datetime-local" value={values.next_followup_at} onChange={(e) => set("next_followup_at", e.target.value)} required /></label>
-          <label><span>Assigned to</span><input value={values.assigned_to} onChange={(e) => set("assigned_to", e.target.value)} placeholder="Team member" /></label>
+          <label><span>Assigned to</span><select value={values.assigned_agent_id} disabled={!canManage} onChange={(e) => set("assigned_agent_id", e.target.value)}><option value="">Unassigned</option>{agents.filter((agent) => agent.is_active).map((agent) => <option key={agent.id} value={agent.id}>{agent.full_name}</option>)}</select></label>
         </div>
         <label><span>Internal notes</span><textarea value={values.notes} onChange={(e) => set("notes", e.target.value)} /></label>
         {!lead && <label className="checkRow"><input type="checkbox" checked={values.createPlan} onChange={(e) => set("createPlan", e.target.checked)} /> Create a gentle 30-day follow-up plan</label>}
