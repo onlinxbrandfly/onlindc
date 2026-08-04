@@ -4,6 +4,7 @@ import useAdminData from "./hooks/useAdminData";
 import SubmissionModal from "./components/SubmissionModal";
 import AdminNavigation from "./components/AdminNavigation";
 import AdminToast from "./components/AdminToast";
+import AdminAppTools from "./components/AdminAppTools";
 import {
   DashboardPage,
   SubmissionsPage,
@@ -53,6 +54,7 @@ export default function AdminApp({ navigate }){
         />
       )}
       <AdminToast message={toast} onClose={() => setToast("")} />
+      <AdminAppTools notify={setToast} />
     </div>
   );
 }
