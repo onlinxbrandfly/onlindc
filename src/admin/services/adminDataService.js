@@ -39,7 +39,7 @@ export async function loadAdminData(){
     supabase.from("pain_points_master").select("*").order("priority", { ascending: false }),
     supabase.from("pain_point_feature_mapping").select("*, industries(name), features_library(name)").order("priority", { ascending: false }),
     supabase.from("industry_hero_features").select("*, industries(name), features_library(name)").order("hero_score", { ascending: false }),
-    supabase.from("crm_leads").select("*, submissions(*, industries(name))").order("priority_score", { ascending: false }),
+    supabase.from("crm_leads").select("*, industries(name), submissions(*, industries(name))").order("priority_score", { ascending: false }),
     supabase.from("crm_followup_templates").select("*").eq("is_active", true).order("day_offset", { ascending: true }),
     supabase.from("crm_followup_tasks").select("*").order("due_at", { ascending: true }),
     supabase.from("crm_followup_events").select("*").order("created_at", { ascending: false })

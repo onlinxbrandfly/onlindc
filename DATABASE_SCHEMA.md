@@ -750,6 +750,38 @@ Recommended direction:
 
 - Retire this table from active recommendation logic after replacing behavior with `feature_industry_mapping`.
 
+## CRM V2
+
+Migration: `supabase/crm_v2.sql`
+
+### `crm_leads`
+
+Standalone sales leads. A lead may optionally reference a diagnostic through `submission_id`, but manual, cold-call, referral and campaign leads do not require a submission.
+
+Important fields:
+
+- Contact: `business_name`, `contact_name`, `phone`, `normalized_phone`, `email`, `city`
+- Classification: `industry_id`, `source`, `source_detail`, `temperature`
+- Sales process: `stage`, `priority_score`, `priority_label`, `estimated_value`, `assigned_to`
+- Intelligence: `detected_pain_points`, `requirements`, `diagnostic_score`
+- Follow-up: `next_action`, `next_followup_at`, `last_contacted_at`, `last_activity_at`
+- Closure: `lost_reason`
+- Provenance: optional unique `submission_id`
+
+### `crm_followup_tasks`
+
+Scheduled calls, WhatsApp messages, emails, meetings and demos. Tasks support status, outcome, rescheduling, ownership, prepared messages and media.
+
+### `crm_followup_events`
+
+Immutable-style activity timeline for lead creation, calls, messages, notes, task changes and pipeline-stage changes. `occurred_at` records when the activity happened; `metadata` allows additive details later.
+
+### `crm_followup_templates`
+
+Reusable, optionally industry- or pain-specific follow-up content. Templates remain independent from generated tasks so editing a template does not rewrite historical follow-ups.
+
+All four CRM tables have RLS enabled by CRM V2 and grant full CRUD only to Supabase `authenticated` users. Public diagnostic users receive no CRM access.
+
 ## Supabase Storage
 
 ### Bucket: `feature-media`

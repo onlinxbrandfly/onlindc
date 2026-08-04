@@ -1,0 +1,92 @@
+import React, { useMemo, useState } from "react";
+import { CRM_SOURCES, CRM_STAGES, findPossibleDuplicates } from "../services/crmService";
+
+function localDateTime(value) {
+  const date = value ? new Date(value) : new Date();
+  date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
+  return date.toISOString().slice(0, 16);
+}
+
+export default function CRMLeadForm({ lead, leads, industries, onClose, onSave }) {
+  const [saving, setSaving] = useState(false);
+  const [values, setValues] = useState({
+    business_name: lead?.business_name || "",
+    contact_name: lead?.contact_name || "",
+    phone: lead?.phone || "",
+    email: lead?.email || "",
+    city: lead?.city || "",
+    industry_id: lead?.industry_id || "",
+    source: lead?.source || "Manual",
+    source_detail: lead?.source_detail || "",
+    stage: lead?.stage || lead?.status || "New",
+    temperature: lead?.temperature || "Warm",
+    detected_pain_points: lead?.detected_pain_points || [],
+    requirements: lead?.requirements || "",
+    notes: lead?.notes || "",
+    estimated_value: lead?.estimated_value || "",
+    assigned_to: lead?.assigned_to || "",
+    next_action: lead?.next_action || "Make first contact",
+    next_followup_at: localDateTime(lead?.next_followup_at),
+    createPlan: !lead
+  });
+  const [painText, setPainText] = useState((values.detected_pain_points || []).join(", "));
+  const duplicates = useMemo(() => findPossibleDuplicates(leads, values, lead?.id), [leads, values.phone, values.email, lead?.id]);
+
+  function set(name, value) {
+    setValues((current) => ({ ...current, [name]: value }));
+  }
+
+  async function submit(event) {
+    event.preventDefault();
+    if (!values.business_name.trim()) return;
+    setSaving(true);
+    try {
+      await onSave({
+        ...values,
+        detected_pain_points: painText.split(",").map((item) => item.trim()).filter(Boolean),
+        next_followup_at: new Date(values.next_followup_at).toISOString()
+      }, lead?.id);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="modalBackdrop">
+      <form className="modal crmLeadForm" onSubmit={submit}>
+        <button type="button" className="modalClose" onClick={onClose} aria-label="Close">x</button>
+        <h2>{lead ? "Edit lead" : "Add a lead"}</h2>
+        <p className="muted">Only the business name is required. Add what you know now and complete the rest later.</p>
+
+        {duplicates.length > 0 && (
+          <div className="crmWarning">
+            <b>Possible duplicate found</b>
+            <span>{duplicates.map((item) => item.business_name || "Existing lead").join(", ")}. Check before saving another lead.</span>
+          </div>
+        )}
+
+        <div className="crmFormGrid">
+          <label><span>Business name *</span><input value={values.business_name} onChange={(e) => set("business_name", e.target.value)} required /></label>
+          <label><span>Contact person</span><input value={values.contact_name} onChange={(e) => set("contact_name", e.target.value)} /></label>
+          <label><span>Mobile number</span><input inputMode="tel" value={values.phone} onChange={(e) => set("phone", e.target.value)} placeholder="98765 43210" /></label>
+          <label><span>Email</span><input type="email" value={values.email} onChange={(e) => set("email", e.target.value)} /></label>
+          <label><span>Industry</span><select value={values.industry_id} onChange={(e) => set("industry_id", e.target.value)}><option value="">Not selected</option>{industries.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+          <label><span>City</span><input value={values.city} onChange={(e) => set("city", e.target.value)} /></label>
+          <label><span>Lead source</span><select value={values.source} onChange={(e) => set("source", e.target.value)}>{CRM_SOURCES.map((item) => <option key={item}>{item}</option>)}</select></label>
+          <label><span>Source details</span><input value={values.source_detail} onChange={(e) => set("source_detail", e.target.value)} placeholder="Who referred them or campaign name" /></label>
+          <label><span>Current stage</span><select value={values.stage} onChange={(e) => set("stage", e.target.value)}>{CRM_STAGES.map((item) => <option key={item}>{item}</option>)}</select></label>
+          <label><span>Interest level</span><select value={values.temperature} onChange={(e) => set("temperature", e.target.value)}><option>Hot</option><option>Warm</option><option>Cold</option></select></label>
+          <label><span>Next action</span><input value={values.next_action} onChange={(e) => set("next_action", e.target.value)} /></label>
+          <label><span>Follow up on</span><input type="datetime-local" value={values.next_followup_at} onChange={(e) => set("next_followup_at", e.target.value)} required /></label>
+          <label><span>Expected value</span><input type="number" min="0" value={values.estimated_value} onChange={(e) => set("estimated_value", e.target.value)} placeholder="INR" /></label>
+          <label><span>Assigned to</span><input value={values.assigned_to} onChange={(e) => set("assigned_to", e.target.value)} placeholder="Team member" /></label>
+        </div>
+        <label><span>Problems / pain points</span><input value={painText} onChange={(e) => setPainText(e.target.value)} placeholder="Separate multiple problems with commas" /></label>
+        <label><span>What do they need?</span><textarea value={values.requirements} onChange={(e) => set("requirements", e.target.value)} /></label>
+        <label><span>Internal notes</span><textarea value={values.notes} onChange={(e) => set("notes", e.target.value)} /></label>
+        {!lead && <label className="checkRow"><input type="checkbox" checked={values.createPlan} onChange={(e) => set("createPlan", e.target.checked)} /> Create a gentle 30-day follow-up plan</label>}
+        <div className="modalActions"><button type="button" className="btn" onClick={onClose}>Cancel</button><button className="btn primary" disabled={saving}>{saving ? "Saving..." : "Save lead"}</button></div>
+      </form>
+    </div>
+  );
+}
