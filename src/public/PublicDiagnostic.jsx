@@ -12,6 +12,7 @@ export default function PublicDiagnostic(){
   const [step, setStep] = useState(-1);
   const [answers, setAnswers] = useState({});
   const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [report, setReport] = useState(null);
   const [error, setError] = useState("");
 
@@ -21,6 +22,7 @@ export default function PublicDiagnostic(){
     const { data, error } = await supabase
       .from("industries")
       .select("*")
+      .in("slug", ["fashion", "jewellery"])
       .eq("is_active", true)
       .order("sort_order", { ascending: true });
 
@@ -93,6 +95,11 @@ export default function PublicDiagnostic(){
       let selected = [];
 
       if(q.question_type === "multiple"){
+        const maxSelections = Number(q.validation_rules?.max_selections || 0);
+        if(checked && maxSelections && existing.length >= maxSelections){
+          alert(`Choose up to ${maxSelections} options for this question.`);
+          return prev;
+        }
         selected = checked ? [...existing, option] : existing.filter(o => o.id !== option.id);
       } else {
         selected = [option];
@@ -165,6 +172,10 @@ export default function PublicDiagnostic(){
   }
 
   async function submit(){
+    if(submitting) return;
+    setSubmitting(true);
+    setError("");
+
     const score = calculateScore();
     const stage = stageFromScore(score.percentage);
     const businessName = getAnswerByKey("business_name") || "Your Business";
@@ -195,7 +206,7 @@ export default function PublicDiagnostic(){
       .select()
       .single();
 
-    if(subError){ setError(subError.message); return; }
+    if(subError){ setError(subError.message); setSubmitting(false); return; }
 
     const rows = Object.values(answers).map(a => ({
       submission_id: submission.id,
@@ -207,14 +218,16 @@ export default function PublicDiagnostic(){
 
     if(rows.length){
       const { error: ansError } = await supabase.from("submission_answers").insert(rows);
-      if(ansError){ setError(ansError.message); return; }
+      if(ansError){ setError(ansError.message); setSubmitting(false); return; }
     }
 
     setReport({ businessName, ownerName, score, stage, summary, reportUrl, reportSlug, industry: industry?.name });
+    setSubmitting(false);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   function next(){
+    if(submitting) return;
     if(!validate()) return;
     if(step < sections.length - 1){
       setStep(step + 1);
@@ -329,8 +342,8 @@ export default function PublicDiagnostic(){
             <button className="btn secondary" onClick={() => step === 0 ? setStep(-1) : setStep(step - 1)}>
               {step === 0 ? "Change Category" : "Back"}
             </button>
-            <button className="btn primary" onClick={next}>
-              {step === sections.length - 1 ? "Generate Report" : "Next"}
+            <button className="btn primary" onClick={next} disabled={submitting}>
+              {submitting ? "Generating..." : step === sections.length - 1 ? "Generate Report" : "Next"}
             </button>
           </div>
         </section>
@@ -343,7 +356,6 @@ function TopBar(){
   return (
     <div className="topBar">
       <div className="brandMark">Onlin.in</div>
-      <a href="/admin">Admin</a>
     </div>
   );
 }
