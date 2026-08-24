@@ -48,7 +48,7 @@ export default function AdminApp({ navigate }){
           <>
             {tab === "overview" && <DashboardPage data={data} onNavigate={setTab} currentAgent={currentAgent} />}
             {tab === "crm" && <CRMPage data={data} reload={reload} notify={setToast} currentAgent={currentAgent} />}
-            {canManage && tab === "team" && <TeamPage data={data} reload={reload} notify={setToast} />}
+            {canManage && tab === "team" && <TeamPage data={data} reload={reload} notify={setToast} currentAgent={currentAgent} />}
             {canManage && tab === "submissions" && <SubmissionsPage submissions={data.submissions} answers={data.answers} onView={setSelectedSubmission} notify={setToast} />}
             {canManage && tab === "builder" && <FormBuilderPage data={data} reload={reload} />}
             {canManage && tab === "knowledge" && <KnowledgePage data={data} reload={reload} />}

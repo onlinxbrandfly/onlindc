@@ -18,6 +18,13 @@ export default function PublicDiagnostic(){
 
   useEffect(() => { loadIndustries(); }, []);
 
+  useEffect(() => {
+    if (!industries.length || industryId) return;
+    const requestedIndustry = new URLSearchParams(window.location.search).get("industry")?.toLowerCase();
+    const match = industries.find((item) => item.slug === requestedIndustry);
+    if (match) setIndustryId(match.id);
+  }, [industries, industryId]);
+
   async function loadIndustries(){
     const { data, error } = await supabase
       .from("industries")

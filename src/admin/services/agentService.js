@@ -14,6 +14,19 @@ export async function updateAgent(agentId, values) {
   return data;
 }
 
+export async function inviteAgent({ fullName, email, phone, role }) {
+  const { data, error } = await supabase.functions.invoke("invite-sales-user", {
+    body: { fullName: fullName.trim(), email: email.trim().toLowerCase(), phone: phone.trim(), role }
+  });
+  if (error) {
+    let message = error.message;
+    try { message = (await error.context.json())?.error || message; } catch { /* Response body may be empty. */ }
+    throw new Error(message);
+  }
+  if (data?.error) throw new Error(data.error);
+  return data;
+}
+
 export async function assignLead({ leadId, fromAgentId, toAgentId, reason }) {
   const { data: { user } } = await supabase.auth.getUser();
   const now = new Date().toISOString();
