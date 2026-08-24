@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { ArrowRight, IndianRupee } from "lucide-react";
 import { CRM_STAGES, leadContact } from "../services/crmService";
 
 export default function CRMPipeline({ leads, onOpen, onMove }) {
@@ -13,7 +14,7 @@ export default function CRMPipeline({ leads, onOpen, onMove }) {
           {items.map((lead) => {
             const contact = leadContact(lead);
             return <button type="button" className="pipelineLead" key={lead.id} onClick={() => onOpen(lead)}>
-              <b>{contact.businessName}</b><small>{contact.contactName || lead.source}</small><span>{lead.priority_label}</span>
+              <div><b>{contact.businessName}</b><small>{contact.contactName || lead.source}</small></div><span>{lead.priority_label}</span>{lead.estimated_value ? <small className="pipelineValue"><IndianRupee size={12} />{Number(lead.estimated_value).toLocaleString("en-IN")}</small> : null}<ArrowRight className="pipelineArrow" size={16} />
             </button>;
           })}
           {!items.length && <p className="pipelineEmpty">No leads</p>}

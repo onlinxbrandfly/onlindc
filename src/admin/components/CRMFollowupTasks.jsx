@@ -1,4 +1,5 @@
 import React from "react";
+import { CalendarClock, Check, Clock3, MessageCircle, Phone } from "lucide-react";
 import { crmCallLink, leadContact } from "../services/crmService";
 
 function bucket(task) {
@@ -23,12 +24,12 @@ export default function CRMFollowupTasks({ tasks, leads, onComplete, onSkip, onR
       const contact = leadContact(lead);
       const call = lead && crmCallLink(lead);
       return <article className={`crmTask ${bucket(task).toLowerCase()}`} key={task.id}>
-        <div className="taskDue"><b>{bucket(task)}</b><span>{new Date(task.due_at).toLocaleDateString()}</span></div>
+        <div className="taskDue"><span className="taskIcon"><CalendarClock size={19} /></span><div><b>{bucket(task)}</b><span>{new Date(task.due_at).toLocaleDateString()}</span></div></div>
         <div className="taskMain"><b>{task.title}</b><span>{contact.businessName} {contact.contactName ? `- ${contact.contactName}` : ""}</span><small>{task.message || task.channel}</small></div>
         <div className="rowActions">
-          {call && <a href={call}>Call</a>}{contact.phone && <button type="button" onClick={() => onWhatsApp(lead, task)}>WhatsApp</button>}
-          <button type="button" className="taskDone" onClick={() => onComplete(task)}>Done</button>
-          <button type="button" onClick={() => onReschedule(task)}>Later</button>
+          {call && <a href={call}><Phone size={15} />Call</a>}{contact.phone && <button type="button" onClick={() => onWhatsApp(lead, task)}><MessageCircle size={15} />WhatsApp</button>}
+          <button type="button" className="taskDone" onClick={() => onComplete(task)}><Check size={15} />Done</button>
+          <button type="button" onClick={() => onReschedule(task)}><Clock3 size={15} />Later</button>
           <button type="button" onClick={() => onSkip(task)}>Skip</button>
         </div>
       </article>;

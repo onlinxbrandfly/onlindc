@@ -3,7 +3,7 @@ import { BarChart3, BookOpen, Building2, ClipboardList, FileText, LayoutDashboar
 
 const primary = [
   { id: "overview", label: "Home", desktopLabel: "Dashboard", icon: LayoutDashboard },
-  { id: "crm", label: "CRM", desktopLabel: "CRM", icon: Users },
+  { id: "crm", label: "Leads", desktopLabel: "Leads & CRM", icon: Users },
   { id: "submissions", label: "Reports", desktopLabel: "Submissions", icon: FileText }
 ];
 
@@ -15,7 +15,7 @@ const secondary = [
 ];
 
 export const ADMIN_TITLES = {
-  overview: "Home", crm: "CRM", submissions: "Reports",
+  overview: "Home", crm: "Leads", submissions: "Reports",
   team: "Sales Team", builder: "Form Builder", knowledge: "Knowledge Centre", industries: "Industries"
 };
 
@@ -37,7 +37,7 @@ export default function AdminNavigation({ tab, onTabChange, onLogout, currentAge
 
   return <>
     <aside className="adminSidebar">
-      <div className="adminBrand"><span>O</span><b>Onlin.in</b></div>
+      <div className="adminBrand"><span>O</span><div><b>Onlin.in</b><small>Sales workspace</small></div></div>
       <nav>
         <small>Workspace</small>
         {visiblePrimary.map((item) => <NavButton key={item.id} item={item} active={tab === item.id} onClick={() => select(item.id)} />)}
@@ -48,7 +48,7 @@ export default function AdminNavigation({ tab, onTabChange, onLogout, currentAge
     </aside>
 
     <header className="adminMobileHeader">
-      <div className="adminBrand"><span>O</span><b>{ADMIN_TITLES[tab]}</b></div>
+      <div className="adminBrand"><span>O</span><div><b>{ADMIN_TITLES[tab]}</b><small>Onlin.in</small></div></div>
       <button type="button" aria-label="Open menu" onClick={() => setMoreOpen(true)}><Menu size={24} /></button>
     </header>
 

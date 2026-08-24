@@ -14,6 +14,8 @@ export default function DashboardPage({ data, onNavigate, currentAgent }) {
   const unassigned = leads.filter((lead) => !lead.assigned_agent_id && !["Won", "Lost"].includes(lead.stage || lead.status));
   const demos = leads.filter((lead) => (lead.stage || lead.status) === "Demo Scheduled");
   const won = leads.filter((lead) => (lead.stage || lead.status) === "Won");
+  const active = leads.filter((lead) => !["Won", "Lost"].includes(lead.stage || lead.status));
+  const conversion = leads.length ? Math.round((won.length / leads.length) * 100) : 0;
   const leadById = new Map(leads.map((lead) => [lead.id, lead]));
   const canManage = ["admin", "manager"].includes(currentAgent?.role);
   const sourceStats = Object.entries(leads.reduce((result, lead) => {
@@ -29,7 +31,7 @@ export default function DashboardPage({ data, onNavigate, currentAgent }) {
   }).sort((a, b) => b.won - a.won || b.leads - a.leads).slice(0, 6);
 
   return <>
-    <div className="pageHead appHomeHead"><div><span className="pageEyebrow">Sales command centre</span><h1>Good {new Date().getHours() < 12 ? "morning" : new Date().getHours() < 17 ? "afternoon" : "evening"}</h1><p className="muted">Here is what needs your attention today.</p></div><button className="btn primary iconTextButton" onClick={() => onNavigate("crm")}><Plus size={19}/>Add lead</button></div>
+    <div className="crmDashboardHero"><div className="pageHead appHomeHead"><div><span className="pageEyebrow">Sales command centre</span><h1>Good {new Date().getHours() < 12 ? "morning" : new Date().getHours() < 17 ? "afternoon" : "evening"}{currentAgent?.full_name ? `, ${currentAgent.full_name.split(" ")[0]}` : ""}</h1><p>Here is what needs your attention today.</p></div><button className="btn crmHeroAdd iconTextButton" onClick={() => onNavigate("crm")}><Plus size={19}/>Add lead</button></div><div className="crmHeroProgress"><div><span><b>{active.length}</b> active opportunities</span><strong>{conversion}% conversion</strong></div><div><i style={{ width: `${conversion}%` }} /></div></div></div>
 
     <section className="homeActionGrid">
       <button className="homeActionCard urgent" onClick={() => onNavigate("crm")}><span><CircleAlert size={22}/></span><div><b>{overdue.length}</b><strong>Needs attention</strong><small>Handle these first</small></div><ArrowRight size={20}/></button>
