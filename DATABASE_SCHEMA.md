@@ -203,6 +203,12 @@ App operations:
 - Insert/update/delete options.
 - Duplicate options with duplicated questions/forms.
 
+#### Jewellery consultative diagnostic v2
+
+`supabase/jewellery_consultative_questionnaire_v2.sql` defines the active Jewellery form using the sequence Contact, Business Context, Customer Discovery, Selling Operations, and Pain/Outcome. It preserves prior form rows as inactive history.
+
+Only nine single-choice operational maturity questions contribute points. Each uses a `0-5` scale and equal weight, producing a maximum raw score of `45`. Business size, business model, pain points, goals, contact details, and free-text impact answers carry zero points so they cannot inflate or reduce digital readiness. The public form normalises the raw result to a percentage.
+
 ### `submissions`
 
 Purpose: One completed diagnostic submission and generated report metadata.
