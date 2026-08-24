@@ -42,10 +42,10 @@ export default function CRMPage({ data, reload, notify = () => {}, currentAgent 
     if (!nextTaskByLead.has(task.lead_id)) nextTaskByLead.set(task.lead_id, task);
   });
   const pending = [...nextTaskByLead.values()];
-  const overdue = pending.filter((task) => new Date(task.due_at) < new Date());
-  const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
-  const todayEnd = new Date(); todayEnd.setHours(23, 59, 59, 999);
-  const dueToday = pending.filter((task) => new Date(task.due_at) >= todayStart && new Date(task.due_at) <= todayEnd);
+  const needsAttention = pending.filter((task) => new Date(task.due_at) <= new Date());
+  const unassigned = sortedLeads.filter((lead) => !lead.assigned_agent_id && !["Won", "Lost"].includes(lead.stage || lead.status));
+  const demos = sortedLeads.filter((lead) => (lead.stage || lead.status) === "Demo Scheduled");
+  const won = sortedLeads.filter((lead) => (lead.stage || lead.status) === "Won");
 
   async function refreshAndClose() {
     await reload();
@@ -81,6 +81,14 @@ export default function CRMPage({ data, reload, notify = () => {}, currentAgent 
     catch (error) { notify(error.message || "Could not move lead."); }
   }
 
+  async function quickAssign(lead, agentId) {
+    try {
+      await assignLead({ leadId: lead.id, fromAgentId: lead.assigned_agent_id, toAgentId: agentId || null, reason: "Quick assignment from lead list" });
+      await reload();
+      notify(agentId ? "Lead assigned." : "Lead moved to Unassigned.");
+    } catch (error) { notify(error.message || "Could not assign lead."); }
+  }
+
   async function complete(task) {
     setDialog({ type: "complete", task, value: "Connected" });
   }
@@ -109,18 +117,17 @@ export default function CRMPage({ data, reload, notify = () => {}, currentAgent 
   return <>
     <div className="pageHead crmPageHead"><div><span className="pageEyebrow">Sales workspace</span><h1>CRM</h1><p className="muted">Your next best actions, in one place.</p></div><div className="rowActions"><button className="btn iconTextButton" onClick={syncLeads} disabled={busy}><RefreshCw size={18} />{busy ? "Checking..." : "Sync"}</button><button className="btn primary iconTextButton" onClick={() => { setEditingLead(null); setShowLeadForm(true); }}><Plus size={19} />Add lead</button></div></div>
 
-    <div className="crmSummary">
-      <button onClick={() => setView("today")}><b>{dueToday.length}</b><span>Due today</span></button>
-      <button onClick={() => setView("today")} className={overdue.length ? "danger" : ""}><b>{overdue.length}</b><span>Overdue</span></button>
-      <button onClick={() => { setFilters({ ...EMPTY_FILTERS, priority: "High Priority" }); setView("leads"); }}><b>{sortedLeads.filter((lead) => lead.priority_label === "High Priority").length}</b><span>High priority</span></button>
-      <button onClick={() => setView("pipeline")}><b>{sortedLeads.filter((lead) => ["Demo Scheduled", "Proposal Sent"].includes(lead.stage || lead.status)).length}</b><span>Active deals</span></button>
-      <button onClick={() => setView("pipeline")}><b>{sortedLeads.filter((lead) => (lead.stage || lead.status) === "Won").length}</b><span>Won</span></button>
+    <div className="crmSummary crmSummarySimple">
+      <button onClick={() => setView("today")} className={needsAttention.length ? "danger" : ""}><b>{needsAttention.length}</b><span>Needs attention</span></button>
+      <button onClick={() => { setFilters({ ...EMPTY_FILTERS, agent: "unassigned" }); setView("leads"); }}><b>{unassigned.length}</b><span>Unassigned</span></button>
+      <button onClick={() => { setFilters({ ...EMPTY_FILTERS, stage: "Demo Scheduled" }); setView("leads"); }}><b>{demos.length}</b><span>Demos</span></button>
+      <button onClick={() => { setFilters({ ...EMPTY_FILTERS, stage: "Won" }); setView("leads"); }}><b>{won.length}</b><span>Won</span></button>
     </div>
 
     <nav className="crmViewTabs" aria-label="CRM views"><button className={view === "today" ? "active" : ""} onClick={() => setView("today")}>Today</button><button className={view === "leads" ? "active" : ""} onClick={() => setView("leads")}>Leads</button><button className={view === "pipeline" ? "active" : ""} onClick={() => setView("pipeline")}>Pipeline</button></nav>
 
     {view === "today" && <><FollowupPlaybooks templates={data.crmTemplates || []} /><CRMFollowupTasks tasks={data.crmTasks || []} leads={sortedLeads} onComplete={complete} onSkip={skip} onReschedule={reschedule} onWhatsApp={(lead, task) => setWhatsapp({ lead, task })} /></>}
-    {view === "leads" && <><CRMFilters filters={filters} onChange={setFilters} agents={data.salesAgents || []} canManage={canManage} /><CRMLeadTable leads={filteredLeads} tasks={data.crmTasks || []} onOpen={setSelectedLead} onWhatsApp={(lead, task) => setWhatsapp({ lead, task })} /></>}
+    {view === "leads" && <><CRMFilters filters={filters} onChange={setFilters} agents={data.salesAgents || []} canManage={canManage} /><CRMLeadTable leads={filteredLeads} agents={data.salesAgents || []} canManage={canManage} onAssign={quickAssign} onOpen={setSelectedLead} onWhatsApp={(lead, task) => setWhatsapp({ lead, task })} /></>}
     {view === "pipeline" && <CRMPipeline leads={filteredLeads} onOpen={setSelectedLead} onMove={changeStatus} />}
 
     {showLeadForm && <CRMLeadForm lead={editingLead} leads={sortedLeads} industries={data.industries || []} agents={data.salesAgents || []} canManage={canManage} currentAgent={currentAgent} onClose={() => { setShowLeadForm(false); setEditingLead(null); }} onSave={saveLead} />}

@@ -1,5 +1,5 @@
 import React from "react";
-import { ArrowRight, CalendarClock, CircleAlert, FileText, Plus, Trophy, Users } from "lucide-react";
+import { ArrowRight, CalendarClock, CircleAlert, Plus, Trophy, Users } from "lucide-react";
 import { leadContact } from "../services/crmService";
 
 export default function DashboardPage({ data, onNavigate, currentAgent }) {
@@ -11,9 +11,8 @@ export default function DashboardPage({ data, onNavigate, currentAgent }) {
   });
   const nextTasks = [...nextByLead.values()];
   const overdue = nextTasks.filter((task) => new Date(task.due_at) < new Date());
-  const weekAgo = Date.now() - 7 * 86400000;
-  const newThisWeek = leads.filter((lead) => new Date(lead.created_at).getTime() >= weekAgo).length;
-  const highPriority = leads.filter((lead) => lead.priority_label === "High Priority" && !["Won", "Lost"].includes(lead.stage || lead.status));
+  const unassigned = leads.filter((lead) => !lead.assigned_agent_id && !["Won", "Lost"].includes(lead.stage || lead.status));
+  const demos = leads.filter((lead) => (lead.stage || lead.status) === "Demo Scheduled");
   const won = leads.filter((lead) => (lead.stage || lead.status) === "Won");
   const leadById = new Map(leads.map((lead) => [lead.id, lead]));
   const canManage = ["admin", "manager"].includes(currentAgent?.role);
@@ -33,10 +32,10 @@ export default function DashboardPage({ data, onNavigate, currentAgent }) {
     <div className="pageHead appHomeHead"><div><span className="pageEyebrow">Sales command centre</span><h1>Good {new Date().getHours() < 12 ? "morning" : new Date().getHours() < 17 ? "afternoon" : "evening"}</h1><p className="muted">Here is what needs your attention today.</p></div><button className="btn primary iconTextButton" onClick={() => onNavigate("crm")}><Plus size={19}/>Add lead</button></div>
 
     <section className="homeActionGrid">
-      <button className="homeActionCard urgent" onClick={() => onNavigate("crm")}><span><CircleAlert size={22}/></span><div><b>{overdue.length}</b><strong>Overdue follow-ups</strong><small>Handle these first</small></div><ArrowRight size={20}/></button>
-      <button className="homeActionCard" onClick={() => onNavigate("crm")}><span><CalendarClock size={22}/></span><div><b>{nextTasks.length}</b><strong>Next actions</strong><small>One per active lead</small></div><ArrowRight size={20}/></button>
-      <button className="homeActionCard" onClick={() => onNavigate("crm")}><span><Users size={22}/></span><div><b>{highPriority.length}</b><strong>High priority</strong><small>Strong opportunities</small></div><ArrowRight size={20}/></button>
-      <button className="homeActionCard" onClick={() => onNavigate("submissions")}><span><FileText size={22}/></span><div><b>{newThisWeek}</b><strong>New this week</strong><small>Across all sources</small></div><ArrowRight size={20}/></button>
+      <button className="homeActionCard urgent" onClick={() => onNavigate("crm")}><span><CircleAlert size={22}/></span><div><b>{overdue.length}</b><strong>Needs attention</strong><small>Handle these first</small></div><ArrowRight size={20}/></button>
+      <button className="homeActionCard" onClick={() => onNavigate("crm")}><span><Users size={22}/></span><div><b>{unassigned.length}</b><strong>Unassigned leads</strong><small>Give every lead an owner</small></div><ArrowRight size={20}/></button>
+      <button className="homeActionCard" onClick={() => onNavigate("crm")}><span><CalendarClock size={22}/></span><div><b>{demos.length}</b><strong>Demos</strong><small>Scheduled opportunities</small></div><ArrowRight size={20}/></button>
+      <button className="homeActionCard" onClick={() => onNavigate("crm")}><span><Trophy size={22}/></span><div><b>{won.length}</b><strong>Won</strong><small>Converted opportunities</small></div><ArrowRight size={20}/></button>
     </section>
 
     <div className="homeColumns">
