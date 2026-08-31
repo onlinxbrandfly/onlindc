@@ -24,7 +24,7 @@ export default function CRMLeadModal({ lead, tasks, events, onClose, onEdit, onS
     <div className="crmDetailGrid">
       <main>
         <section className="crmInfoPanel"><div className="crmPanelTitle"><h3>Lead overview</h3><span>Customer profile</span></div><div className="crmFacts"><span><small>Priority</small><b>{lead.priority_label}</b></span><span><small>Source</small><b>{lead.source || "Manual"}</b></span><span><small>Industry</small><b>{contact.industry || "Not selected"}</b></span><span><small>Interest</small><b>{lead.temperature || "Warm"}</b></span><span><small>City</small><b>{lead.city || "-"}</b></span><span><small>Expected value</small><b>{lead.estimated_value ? `INR ${Number(lead.estimated_value).toLocaleString("en-IN")}` : "-"}</b></span></div>
-          <p><b>Problems:</b> {(lead.detected_pain_points || []).join(", ") || "Not recorded"}</p><p><b>Needs:</b> {lead.requirements || "Not recorded"}</p><p><b>Notes:</b> {lead.notes || "No notes yet"}</p>
+          <p><b>Problems:</b> {(lead.detected_pain_points || []).join(", ") || "Not recorded"}</p><p><b>Problem notes:</b> {lead.problem_notes || "Not recorded"}</p><p><b>Needs:</b> {lead.requirements || "Not recorded"}</p><p><b>Notes:</b> {lead.notes || "No notes yet"}</p>
         </section>
 
         <section className="crmInfoPanel"><div className="crmSectionHead"><div className="crmPanelTitle"><h3>Follow-up plan</h3><span>Next customer actions</span></div><b>{leadTasks.filter((item) => item.status === "Pending").length} pending</b></div>

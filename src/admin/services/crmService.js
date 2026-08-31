@@ -163,6 +163,7 @@ export async function saveCrmLead({ values, leadId, templates = [], createPlan =
     status: values.stage || "New",
     temperature: values.temperature || "Warm",
     detected_pain_points: values.detected_pain_points || [],
+    problem_notes: values.problem_notes?.trim() || null,
     requirements: values.requirements?.trim() || null,
     notes: values.notes?.trim() || null,
     estimated_value: values.estimated_value ? Number(values.estimated_value) : null,

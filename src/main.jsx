@@ -27,6 +27,22 @@ function App(){
     };
   }, []);
 
+  useEffect(() => {
+    if (!session || !route.startsWith("/admin") || route === "/admin/login" || route === "/admin/reset-password") return undefined;
+
+    const keepAdminOpen = () => {
+      const backEvent = new CustomEvent("admin-app-back", { cancelable: true });
+      window.dispatchEvent(backEvent);
+      window.history.pushState({ adminApp: true }, "", "/admin");
+      setRoute("/admin");
+    };
+
+    window.history.replaceState({ ...window.history.state, adminApp: true }, "", "/admin");
+    window.history.pushState({ adminApp: true }, "", "/admin");
+    window.addEventListener("popstate", keepAdminOpen);
+    return () => window.removeEventListener("popstate", keepAdminOpen);
+  }, [session, route]);
+
   const navigate = (path) => {
     window.history.pushState({}, "", path);
     setRoute(path);

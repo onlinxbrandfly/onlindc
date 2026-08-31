@@ -8,7 +8,7 @@ function localDateTime(value) {
   return date.toISOString().slice(0, 16);
 }
 
-export default function CRMLeadForm({ lead, leads, industries, agents = [], canManage = false, currentAgent, onClose, onSave }) {
+export default function CRMLeadForm({ lead, leads, industries, painPoints = [], agents = [], canManage = false, currentAgent, onClose, onSave }) {
   const [saving, setSaving] = useState(false);
   const [step, setStep] = useState(0);
   const [values, setValues] = useState({
@@ -23,6 +23,7 @@ export default function CRMLeadForm({ lead, leads, industries, agents = [], canM
     stage: lead?.stage || lead?.status || "New",
     temperature: lead?.temperature || "Warm",
     detected_pain_points: lead?.detected_pain_points || [],
+    problem_notes: lead?.problem_notes || "",
     requirements: lead?.requirements || "",
     notes: lead?.notes || "",
     estimated_value: lead?.estimated_value || "",
@@ -31,8 +32,8 @@ export default function CRMLeadForm({ lead, leads, industries, agents = [], canM
     next_followup_at: localDateTime(lead?.next_followup_at),
     createPlan: !lead
   });
-  const [painText, setPainText] = useState((values.detected_pain_points || []).join(", "));
   const duplicates = useMemo(() => findPossibleDuplicates(leads, values, lead?.id), [leads, values.phone, values.email, lead?.id]);
+  const availablePainPoints = useMemo(() => painPoints.filter((item) => item.is_active !== false), [painPoints]);
 
   function set(name, value) {
     setValues((current) => ({ ...current, [name]: value }));
@@ -40,12 +41,12 @@ export default function CRMLeadForm({ lead, leads, industries, agents = [], canM
 
   async function submit(event) {
     event.preventDefault();
+    if (event.nativeEvent.submitter?.dataset.action !== "save-lead") return;
     if (!values.business_name.trim()) return;
     setSaving(true);
     try {
       await onSave({
         ...values,
-        detected_pain_points: painText.split(",").map((item) => item.trim()).filter(Boolean),
         next_followup_at: new Date(values.next_followup_at).toISOString()
       }, lead?.id);
     } finally {
@@ -54,6 +55,15 @@ export default function CRMLeadForm({ lead, leads, industries, agents = [], canM
   }
 
   const steps = ["Contact", "Business", "Follow-up"];
+
+  function addPainPoint(title) {
+    if (!title || values.detected_pain_points.includes(title)) return;
+    set("detected_pain_points", [...values.detected_pain_points, title]);
+  }
+
+  function removePainPoint(title) {
+    set("detected_pain_points", values.detected_pain_points.filter((item) => item !== title));
+  }
 
   return (
     <div className="modalBackdrop">
@@ -84,7 +94,9 @@ export default function CRMLeadForm({ lead, leads, industries, agents = [], canM
           <label><span>Interest level</span><select value={values.temperature} onChange={(e) => set("temperature", e.target.value)}><option>Hot</option><option>Warm</option><option>Cold</option></select></label>
           <label><span>Expected value</span><input type="number" min="0" value={values.estimated_value} onChange={(e) => set("estimated_value", e.target.value)} placeholder="INR" /></label>
         </div>
-        <label><span>Problems / pain points</span><input value={painText} onChange={(e) => setPainText(e.target.value)} placeholder="Separate problems with commas" /></label>
+        <label><span>Problems / pain points</span><select value="" onChange={(e) => addPainPoint(e.target.value)}><option value="">Select a problem</option>{availablePainPoints.filter((item) => !values.detected_pain_points.includes(item.title)).map((item) => <option key={item.code} value={item.title}>{item.title}</option>)}</select></label>
+        {values.detected_pain_points.length > 0 && <div className="selectedPainPoints">{values.detected_pain_points.map((item) => <span key={item}>{item}<button type="button" onClick={() => removePainPoint(item)} aria-label={`Remove ${item}`}><X size={14} /></button></span>)}</div>}
+        <label><span>Problem notes</span><textarea value={values.problem_notes} onChange={(e) => set("problem_notes", e.target.value)} placeholder="Add context, examples or what the customer said" /></label>
         <label><span>What do they need?</span><textarea value={values.requirements} onChange={(e) => set("requirements", e.target.value)} /></label></div>}
         {step === 2 && <div className="crmStepPanel"><p className="muted">Decide the next clear action. You can change this anytime.</p><div className="crmFormGrid">
           <label><span>Next action</span><input value={values.next_action} onChange={(e) => set("next_action", e.target.value)} /></label>
@@ -96,7 +108,7 @@ export default function CRMLeadForm({ lead, leads, industries, agents = [], canM
         </div>}
         <div className="modalActions appFormActions">
           {step > 0 ? <button type="button" className="btn" onClick={() => setStep(step - 1)}><ArrowLeft size={18} /> Back</button> : <button type="button" className="btn" onClick={onClose}>Cancel</button>}
-          {step < 2 ? <button type="button" className="btn primary" disabled={step === 0 && !values.business_name.trim()} onClick={() => setStep(step + 1)}>Continue <ArrowRight size={18} /></button> : <button className="btn primary" disabled={saving}>{saving ? "Saving..." : "Save lead"}</button>}
+          {step < 2 ? <button type="button" className="btn primary" disabled={step === 0 && !values.business_name.trim()} onClick={() => setStep((current) => Math.min(current + 1, 2))}>Continue <ArrowRight size={18} /></button> : <button type="submit" data-action="save-lead" className="btn primary" disabled={saving}>{saving ? "Saving..." : "Save lead"}</button>}
         </div>
       </form>
     </div>

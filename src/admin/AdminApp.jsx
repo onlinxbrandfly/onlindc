@@ -27,6 +27,16 @@ export default function AdminApp({ navigate }){
     localStorage.setItem("admin-tab", tab);
   }, [tab]);
 
+  useEffect(() => {
+    const handleAppBack = (event) => {
+      window.setTimeout(() => {
+        if (!event.defaultPrevented && tab !== "overview") setTab("overview");
+      }, 0);
+    };
+    window.addEventListener("admin-app-back", handleAppBack);
+    return () => window.removeEventListener("admin-app-back", handleAppBack);
+  }, [tab]);
+
   useEffect(() => { loadCurrentAgent().then(setCurrentAgent).catch((error) => setToast(error.message)); }, []);
   const canManage = ["admin", "manager"].includes(currentAgent?.role);
 
