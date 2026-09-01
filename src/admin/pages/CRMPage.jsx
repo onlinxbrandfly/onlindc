@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import CRMFilters from "../components/CRMFilters";
 import CRMFollowupTasks from "../components/CRMFollowupTasks";
+import BulkLeadImportModal from "../components/BulkLeadImportModal";
 import CRMLeadForm from "../components/CRMLeadForm";
 import CRMLeadModal from "../components/CRMLeadModal";
 import CRMLeadTable from "../components/CRMLeadTable";
@@ -12,7 +13,7 @@ import {
   addCrmActivity, completeCrmTask, createCrmTask, leadContact, rescheduleCrmTask,
   saveCrmLead, skipCrmTask, syncCrmFromSubmissions, updateCrmLeadStatus
 } from "../services/crmService";
-import { Plus, RefreshCw, X } from "lucide-react";
+import { Plus, RefreshCw, Upload, X } from "lucide-react";
 
 const EMPTY_FILTERS = { search: "", stage: "", source: "", priority: "", agent: "" };
 
@@ -22,6 +23,7 @@ export default function CRMPage({ data, reload, notify = () => {}, currentAgent 
   const [selectedLead, setSelectedLead] = useState(null);
   const [editingLead, setEditingLead] = useState(null);
   const [showLeadForm, setShowLeadForm] = useState(false);
+  const [showBulkImport, setShowBulkImport] = useState(false);
   const [busy, setBusy] = useState(false);
   const [dialog, setDialog] = useState(null);
   const [whatsapp, setWhatsapp] = useState(null);
@@ -31,6 +33,7 @@ export default function CRMPage({ data, reload, notify = () => {}, currentAgent 
     const handleAppBack = (event) => {
       if (dialog) setDialog(null);
       else if (whatsapp) setWhatsapp(null);
+      else if (showBulkImport) setShowBulkImport(false);
       else if (showLeadForm) { setShowLeadForm(false); setEditingLead(null); }
       else if (selectedLead) setSelectedLead(null);
       else return;
@@ -38,7 +41,7 @@ export default function CRMPage({ data, reload, notify = () => {}, currentAgent 
     };
     window.addEventListener("admin-app-back", handleAppBack);
     return () => window.removeEventListener("admin-app-back", handleAppBack);
-  }, [dialog, whatsapp, showLeadForm, selectedLead]);
+  }, [dialog, whatsapp, showBulkImport, showLeadForm, selectedLead]);
 
   const sortedLeads = useMemo(() => [...(data.crmLeads || [])].sort((a, b) => Number(b.priority_score || 0) - Number(a.priority_score || 0) || new Date(b.created_at) - new Date(a.created_at)), [data.crmLeads]);
   const filteredLeads = useMemo(() => sortedLeads.filter((lead) => {
@@ -85,6 +88,45 @@ export default function CRMPage({ data, reload, notify = () => {}, currentAgent 
     } catch (error) { notify(error.message || "Could not save lead."); throw error; }
   }
 
+  async function importLeads(rows, options) {
+    const result = { imported: 0, updated: 0, skipped: 0, failed: 0, errors: [] };
+    for (const row of rows.filter((item) => !item.errors.length)) {
+      if (row.duplicate && options.duplicateMode === "skip") { result.skipped += 1; continue; }
+      try {
+        let values = { ...row.values };
+        let leadId;
+        if (row.duplicate) {
+          leadId = row.duplicate.id;
+          const existing = row.duplicate;
+          const base = {
+            business_name: existing.business_name || existing.submissions?.business_name || "",
+            contact_name: existing.contact_name || existing.submissions?.owner_name || "",
+            phone: existing.phone || existing.submissions?.phone || "", email: existing.email || existing.submissions?.email || "",
+            city: existing.city || "", industry_id: existing.industry_id || "", source: existing.source || "Manual",
+            source_detail: existing.source_detail || "", stage: existing.stage || existing.status || "New", temperature: existing.temperature || "Warm",
+            detected_pain_points: existing.detected_pain_points || [], problem_notes: existing.problem_notes || "", requirements: existing.requirements || "",
+            notes: existing.notes || "", estimated_value: existing.estimated_value || "", assigned_agent_id: existing.assigned_agent_id || "",
+            next_action: existing.next_action || "Make first contact", next_followup_at: existing.next_followup_at || new Date().toISOString()
+          };
+          values = { ...base, ...Object.fromEntries(row.provided.map((key) => [key, row.values[key]])) };
+        }
+        if (options.assignedAgentId) values.assigned_agent_id = options.assignedAgentId;
+        const saved = await saveCrmLead({ values, leadId, templates: data.crmTemplates, createPlan: !leadId && options.createPlans });
+        if ((row.duplicate?.assigned_agent_id || null) !== (saved.assigned_agent_id || null)) {
+          await assignLead({ leadId: saved.id, fromAgentId: row.duplicate?.assigned_agent_id || null, toAgentId: saved.assigned_agent_id, reason: "Assigned during bulk import" });
+        }
+        if (leadId) result.updated += 1; else result.imported += 1;
+      } catch (error) {
+        result.failed += 1;
+        result.errors.push(`Row ${row.rowNumber}: ${error.message || "Could not save lead"}`);
+      }
+    }
+    result.skipped += rows.filter((row) => row.errors.length).length;
+    await reload();
+    notify(`${result.imported} lead(s) added${result.updated ? `, ${result.updated} updated` : ""}.`);
+    return result;
+  }
+
   async function changeStatus(lead, status) {
     if (status === "Lost") {
       setDialog({ type: "lost", lead, status, value: lead.lost_reason || "" });
@@ -128,7 +170,7 @@ export default function CRMPage({ data, reload, notify = () => {}, currentAgent 
   }
 
   return <>
-    <div className="pageHead crmPageHead"><div><span className="pageEyebrow">Sales workspace</span><h1>CRM</h1><p className="muted">Your next best actions, in one place.</p></div><div className="rowActions"><button className="btn iconTextButton" onClick={syncLeads} disabled={busy}><RefreshCw size={18} />{busy ? "Checking..." : "Sync"}</button><button className="btn primary iconTextButton" onClick={() => { setEditingLead(null); setShowLeadForm(true); }}><Plus size={19} />Add lead</button></div></div>
+    <div className="pageHead crmPageHead"><div><span className="pageEyebrow">Sales workspace</span><h1>CRM</h1><p className="muted">Your next best actions, in one place.</p></div><div className="rowActions"><button className="btn iconTextButton" onClick={syncLeads} disabled={busy}><RefreshCw size={18} />{busy ? "Checking..." : "Sync"}</button><button className="btn iconTextButton" onClick={() => setShowBulkImport(true)}><Upload size={18}/>Import</button><button className="btn primary iconTextButton" onClick={() => { setEditingLead(null); setShowLeadForm(true); }}><Plus size={19} />Add lead</button></div></div>
 
     <div className="crmSummary crmSummarySimple">
       <button onClick={() => setView("today")} className={needsAttention.length ? "danger" : ""}><b>{needsAttention.length}</b><span>Needs attention</span></button>
@@ -144,6 +186,7 @@ export default function CRMPage({ data, reload, notify = () => {}, currentAgent 
     {view === "pipeline" && <CRMPipeline leads={filteredLeads} onOpen={setSelectedLead} onMove={changeStatus} />}
 
     {showLeadForm && <CRMLeadForm lead={editingLead} leads={sortedLeads} industries={data.industries || []} painPoints={data.painMaster || []} agents={data.salesAgents || []} canManage={canManage} currentAgent={currentAgent} onClose={() => { setShowLeadForm(false); setEditingLead(null); }} onSave={saveLead} />}
+    {showBulkImport && <BulkLeadImportModal leads={sortedLeads} industries={data.industries || []} agents={data.salesAgents || []} canManage={canManage} onClose={() => setShowBulkImport(false)} onImport={importLeads}/>}
     {selectedLead && <CRMLeadModal lead={selectedLead} tasks={data.crmTasks || []} events={data.crmEvents || []} onClose={() => setSelectedLead(null)} onEdit={(lead) => { setEditingLead(lead); setSelectedLead(null); setShowLeadForm(true); }} onStatusChange={changeStatus} onComplete={complete} onSkip={skip} onReschedule={reschedule} onWhatsApp={(lead, task) => setWhatsapp({ lead, task })} onAddActivity={async (activity) => { try { await addCrmActivity({ leadId: selectedLead.id, type: "activity", ...activity }); await refreshAndClose(); notify("Activity added."); } catch (error) { notify(error.message || "Could not add activity."); } }} onCreateTask={async (task) => { try { await createCrmTask({ leadId: selectedLead.id, ...task }); await refreshAndClose(); notify("Follow-up added."); } catch (error) { notify(error.message || "Could not add follow-up."); } }} />}
     {whatsapp && <WhatsAppComposer lead={whatsapp.lead} task={whatsapp.task} onClose={() => setWhatsapp(null)} onReschedule={reschedule} onOutcome={async (outcome, message) => { try { if (whatsapp.task) await completeCrmTask({ leadId: whatsapp.lead.id, taskId: whatsapp.task.id, outcome, note: message }); else await addCrmActivity({ leadId: whatsapp.lead.id, type: "contacted", channel: "WhatsApp", outcome, note: message }); await reload(); notify(`${outcome} recorded.`); } catch (error) { notify(error.message || "Could not record WhatsApp activity."); throw error; } }} />}
     {dialog && <div className="appSheetBackdrop"><form className="appSheet crmActionSheet" onSubmit={submitDialog}><div className="appSheetHandle"/><header><h2>{dialog.type === "complete" ? "Complete follow-up" : dialog.type === "reschedule" ? "Choose a new time" : dialog.type === "lost" ? "Mark lead as lost" : "Skip follow-up?"}</h2><button type="button" aria-label="Close" onClick={() => setDialog(null)}><X size={21}/></button></header>{dialog.type === "complete" && <label><span>Outcome</span><select value={dialog.value} onChange={(event) => setDialog({ ...dialog, value: event.target.value })}><option>Connected</option><option>No answer</option><option>Interested</option><option>Demo requested</option><option>Not interested</option></select></label>}{dialog.type === "reschedule" && <label><span>Follow up on</span><input type="datetime-local" required value={dialog.value} onChange={(event) => setDialog({ ...dialog, value: event.target.value })}/></label>}{dialog.type === "lost" && <label><span>Reason</span><textarea required value={dialog.value} onChange={(event) => setDialog({ ...dialog, value: event.target.value })} placeholder="What happened?"/></label>}{dialog.type === "skip" && <p>This removes the task from Today but keeps it in the lead history.</p>}<div className="modalActions"><button type="button" className="btn" onClick={() => setDialog(null)}>Cancel</button><button className="btn primary">Confirm</button></div></form></div>}

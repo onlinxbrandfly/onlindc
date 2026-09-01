@@ -6,7 +6,7 @@ export const CRM_STAGES = [
 ];
 
 export const CRM_SOURCES = [
-  "Manual", "Diagnostic", "Cold Call", "Referral", "Website", "WhatsApp",
+  "Manual", "Bulk Import", "Diagnostic", "Cold Call", "Referral", "Website", "WhatsApp",
   "Instagram", "Exhibition", "Partner", "Other"
 ];
 
